@@ -7,11 +7,12 @@ import torch.nn.functional as F
 import ast
 
 from torchvision import datasets
-from torchvision.transforms import ToTensor
+import torchvision.transforms
 from torch.utils.data import DataLoader
 from torch.distributions.normal import Normal
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+normalize = True # whether or not to normalize the data
 
 def weights_to_vec(cnn):
     '''
@@ -116,7 +117,7 @@ class EvoAgent:
                                torchvision.transforms.ToTensor(),
                                torchvision.transforms.Normalize(
                                  (0.1307,), (0.3081,))
-                        ]),
+                        ]) if normalize else torchvision.transforms.ToTensor(),
             download = True,
         )
 
@@ -127,7 +128,7 @@ class EvoAgent:
                                torchvision.transforms.ToTensor(),
                                torchvision.transforms.Normalize(
                                  (0.1307,), (0.3081,))
-                        ]),
+                        ]) if normalize else torchvision.transforms.ToTensor(),
             download = True,
         )
 
