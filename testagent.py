@@ -112,14 +112,23 @@ class EvoAgent:
         self.train_data = datasets.MNIST(
             root = 'data',
             train = True,
-            transform = ToTensor(),
+            transform = torchvision.transforms.Compose([
+                               torchvision.transforms.ToTensor(),
+                               torchvision.transforms.Normalize(
+                                 (0.1307,), (0.3081,))
+                        ]),
             download = True,
         )
 
         self.test_data = datasets.MNIST(
             root = 'data',
             train = False,
-            transform = ToTensor()
+            transform = torchvision.transforms.Compose([
+                               torchvision.transforms.ToTensor(),
+                               torchvision.transforms.Normalize(
+                                 (0.1307,), (0.3081,))
+                        ]),
+            download = True,
         )
 
         self.loaders = {
