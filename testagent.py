@@ -97,7 +97,7 @@ class EvoAgent:
     :param modeltype: can be used to use different CNN models, e.g. model=1 or model=2. Custom models can easily be added
     :param model: allows to load a saved model. Model has to be file containing a list with model parameters (same format as produced by `self.save()`). New model is initialized if model == ''.
     '''
-    def __init__(self, lr = 0.00002, sigma = 0.01, n = 100, modeltype = 1, model = ''):
+    def __init__(self, lr = 0.01, sigma = 0.01, n = 100, modeltype = 1, model = ''):
         if modeltype == 1:
             self.net = CNN()
         else:
@@ -212,7 +212,7 @@ class EvoAgent:
             weight_update = np.zeros(self.parnumber)
             tests = []
             for j in range(2*self.n):
-                weights = torch.tensor(curr_weights + self.sigma*noise[j], dtype=torch.float32) # note: tensor+np.array returns tensor
+                weights = (curr_weights + self.sigma*noise[j]).to(torch.float32) # note: tensor+np.array returns tensor
                 vec_to_weights(weights, self.net) # sets agent's weights to current noisy weights
                 perf = self.test()
                 weight_update += (perf - curr_perf)*noise[j]
@@ -221,7 +221,7 @@ class EvoAgent:
             print('avg noise performance: {}'.format(sum(tests)/len(tests)))
             weight_update = self.lr/(2*self.n*self.sigma)*weight_update
             print('weight update mean: {}'.format(torch.tensor(weight_update).abs().mean()))
-            new_weights = torch.tensor(curr_weights + weight_update, dtype=torch.float32)
+            new_weights = (curr_weights + weight_update).to(torch.float32)
             vec_to_weights(new_weights, self.net)
 
     def train_elite(self, rounds = 1000, elite = 0.1):
@@ -237,7 +237,7 @@ class EvoAgent:
             noise = np.concatenate((noise, -noise))
             tests = []
             for j in range(2*self.n):
-                weights = torch.tensor(curr_weights + self.sigma*noise[j], dtype=torch.float32) # note: tensor+np.array returns tensor
+                weights = (curr_weights + self.sigma*noise[j]).to(torch.float32) # note: tensor+np.array returns tensor
                 vec_to_weights(weights, self.net)
                 tests.append(self.test())
             noise = [[noise[j], tests[j]] for j in range(2*self.n)] # inserts each noise's test result into the respective array element
@@ -253,7 +253,7 @@ class EvoAgent:
                 weight_update += self.sigma*noise[-j-1][0]
             weight_update /= elite_share
             print('weight update mean: {}'.format(torch.tensor(weight_update).abs().mean()))
-            new_weights = torch.tensor(curr_weights + weight_update, dtype=torch.float32)
+            new_weights = (curr_weights + weight_update).to(torch.float32)
             vec_to_weights(new_weights, self.net)
 if __name__ == '__main__':
     a = EvoAgent()
