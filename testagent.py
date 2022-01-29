@@ -97,7 +97,7 @@ class EvoAgent:
     :param modeltype: can be used to use different CNN models, e.g. model=1 or model=2. Custom models can easily be added
     :param model: allows to load a saved model. Model has to be file containing a list with model parameters (same format as produced by `self.save()`). New model is initialized if model == ''.
     '''
-    def __init__(self, lr = 0.01, sigma = 0.01, n = 100, modeltype = 1, model = ''):
+    def __init__(self, lr = 0.05, sigma = 0.01, n = 100, modeltype = 1, model = ''):
         if modeltype == 1:
             self.net = CNN()
         else:
@@ -166,7 +166,7 @@ class EvoAgent:
 
     def test(self, rounds = 5):
         '''
-        tests the model on `rounds` training sets and returns performance.
+        tests the model on `rounds` training sets of size 100 and returns performance.
         '''
         self.net.eval()
         with torch.no_grad():
@@ -183,7 +183,7 @@ class EvoAgent:
 
     def test_on_testset(self, rounds = 20):
         '''
-        tests the model on `rounds` test sets and returns performance.
+        tests the model on `rounds` test sets of size 100 and returns performance.
         '''
         self.net.eval()
         with torch.no_grad():
@@ -198,9 +198,9 @@ class EvoAgent:
                     break
         return sum(accuracy)/len(accuracy)
 
-    def train(self, rounds = 1000):
+    def train(self, rounds = 100):
         '''
-        trains agent by weighting noise proportional to its performance, as in the paper "Evolution Strategies as a
+        Trains agent by weighting noise proportional to its performance, as in the paper "Evolution Strategies as a
         Scalable Alternative to Reinforcement Learning".
         '''
         for i in tqdm(range(rounds)):
@@ -208,23 +208,23 @@ class EvoAgent:
             print('current absolute weight average: {}'.format(curr_weights.abs().mean()))
             curr_perf = self.test(50)
             noise = np.array([np.array(self.dist.sample()) for _ in range(self.n)], dtype=float)
-            noise = np.append(noise, [-noise[j] for j in range(self.n)])
+            noise = np.concatenate((noise, -noise))
             weight_update = np.zeros(self.parnumber)
             tests = []
             for j in range(2*self.n):
                 weights = (curr_weights + self.sigma*noise[j]).to(torch.float32) # note: tensor+np.array returns tensor
                 vec_to_weights(weights, self.net) # sets agent's weights to current noisy weights
                 perf = self.test()
-                weight_update += (perf - curr_perf)*noise[j]
+                weight_update += max(0, (perf - curr_perf))*noise[j]
                 tests.append(perf)
-            print('noise performance: {}'.format(tests))
+            #print('noise performance: {}'.format(tests))
             print('avg noise performance: {}'.format(sum(tests)/len(tests)))
             weight_update = self.lr/(2*self.n*self.sigma)*weight_update
             print('weight update mean: {}'.format(torch.tensor(weight_update).abs().mean()))
             new_weights = (curr_weights + weight_update).to(torch.float32)
             vec_to_weights(new_weights, self.net)
 
-    def train_elite(self, rounds = 1000, elite = 0.1):
+    def train_elite(self, rounds = 100, elite = 0.1):
         '''
         Trains the agent by choosing an elite set in each iteration. the average weight out of this elite set will be used as mean in the following iteration.
         :param elite: the top `elite` agents in each iteration will be used in the weight update.
@@ -247,7 +247,9 @@ class EvoAgent:
             #print('number of elite agents: {}'.format(elite_share))
             noise = sorted(noise, key=lambda x: x[1]) # sort noise by its performance
             #print('noise performance: {}'.format([n[1] for n in noise]))
-            print('performance of elite: {}'.format([n[1] for n in noise[2*self.n-elite_share:]]))
+            elite_performance = [n[1] for n in noise[2*self.n-elite_share:]]
+            #print('performance of elite: {}'.format(elite_performance))
+            print('performance of elite: {} to {}'.format(elite_performance[0], elite_performance[-1]))
             weight_update = np.zeros(self.parnumber)
             for j in range(elite_share):
                 weight_update += self.sigma*noise[-j-1][0]
