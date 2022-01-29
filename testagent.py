@@ -164,7 +164,7 @@ class EvoAgent:
         file.write(str(weights_to_vec(self.net).tolist()))
         file.close()
 
-    def test(self, rounds = 5):
+    def test(self, rounds = 50):
         '''
         tests the model on `rounds` training sets of size 100 and returns performance.
         '''
