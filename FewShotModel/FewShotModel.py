@@ -129,7 +129,7 @@ class CNN(nn.Module):
 			output = self.out(x)
 		return output
 
-class CNN2(nn.Module):
+class FCNN(nn.Module):
 	'''
 	Small classifier network used in training the first layer. 82 trainable parameters.
 	'''
@@ -159,7 +159,7 @@ class Classifier:
 	'''
 	def __init__(self, evoagent, traindata_cat, traintargets_cat, traindata_other, traintargets_other, testdata_cat, testtargets_cat, testdata_other, testtargets_other, lr = 0.1):
 		self.evoagent = evoagent
-		self.net = CNN2()
+		self.net = FCNN()
 		self.traindata_cat = traindata_cat
 		self.traintargets_cat = traintargets_cat
 		self.traindata_other = traindata_other
