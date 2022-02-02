@@ -134,7 +134,7 @@ class FCNN(nn.Module):
 	Small classifier network used in training the first layer. 82 trainable parameters.
 	'''
 	def __init__(self):
-		super(CNN2, self).__init__()
+		super(FCNN, self).__init__()
 		self.fc1 = nn.Linear(40, 2)
 
 
@@ -184,16 +184,23 @@ class Classifier:
 		self.net.train()
 		for i in range(n//5): # training loop
 			out = self.net(traindata[i:i+5])
+			#print(f"Classifier training prediction: {out}")
+			#print(f"Classifier training data batch: {traindata[i:i+5]}")
 			self.optimizer.zero_grad()
 			loss = F.binary_cross_entropy(out, traintargets[i:i+5])
+			#print(f"Batch loss: {loss}")
+			#print(f"Classifier training targets batch: {traintargets[i:i+5]}")
 			loss.backward()
 			self.optimizer.step()
 		self.net.eval()
 		testdata = torch.cat((self.testdata_cat, self.testdata_other))
 		testtargets = torch.cat((self.testtargets_cat, self.testtargets_other))
+		#print(f"Classifier test data targets: {testtargets}")
 		targets_guess = self.net(testdata)
+		#print(f"Classifier test data target guess: {targets_guess}")
 		m = len(testtargets)
-		compare = [torch.argmax(testtargets[i])==torch.argmax(targets_guess) for i in range(m)]
+		compare = [torch.argmax(testtargets[i])==torch.argmax(targets_guess[i]) for i in range(m)]
+		#print(f"Classifier performance: {sum(compare)/m}")
 		return sum(compare)/m
 
 
@@ -277,8 +284,9 @@ class EvoAgent:
 				scores = [classifier.train() for classifier in classifiers]
 				weight_update += float(sum(scores))*noise[j]
 				tests.append(sum(scores)/nb_classifiers)
-			print('noise performance: {}'.format(tests))
+			#print('noise performance: {}'.format(tests))
 			print('avg noise performance: {}'.format(sum(tests)/len(tests)))
+			print(f'min and max noise performance: {min(tests)}, {max(tests)}')
 			weight_update = self.lr/(2*self.n*self.sigma)*weight_update
 			print('weight update mean: {}'.format(torch.tensor(weight_update).abs().mean()))
 			new_weights = (curr_weights + weight_update).to(torch.float32)
