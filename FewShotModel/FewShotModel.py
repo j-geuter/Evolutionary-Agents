@@ -219,7 +219,7 @@ class EvoAgent:
 	:param categories_ratio: ratio of how many categories are for training.
 	:param dir: directory of data. NOTE: Change accordingly.
 	'''
-	def __init__(self, lr = 0.015, sigma = 0.01, n = 1000, train_nb = 100, test_nb = 100, model = '', categories_ratio = 0.7, dir = '/home/jonathan/Documents/Studium/VaiosProject/FewShotModel/data/'):
+	def __init__(self, lr = 0.075, sigma = 0.01, n = 500, train_nb = 100, test_nb = 100, model = '', categories_ratio = 0.7, dir = '/home/jonathan/Documents/Studium/VaiosProject/FewShotModel/data/'):
 		categories = os.listdir(dir)
 		nb_train = int(categories_ratio*len(categories))
 		self.train_cats = random.sample(categories, nb_train) # names of categories used for training
@@ -255,9 +255,13 @@ class EvoAgent:
 
 	def train(self, rounds = 100, nb_classifiers = 8):
 		'''
-		Trains agent.
+		Trains agent by creating noise samples in each iteration, and then updating the network's weights using a weighted average of the noise.
+		:param rounds: number of training rounds.
+		:param nb_classifiers: number of classifiers generated for each noise sample.
+		:return: `plot_data` which tracks the average noise performance for each training iteration.
 		'''
 		avg_perf = 0
+		plot_data = [] # collects the average noise performances for each iteration. can be plotted with self.plot
 		for i in tqdm(range(rounds)):
 			print('\n--------------------------------------------------------------------------------')
 			curr_weights = deepcopy(weights_to_vec(self.net))
@@ -266,7 +270,6 @@ class EvoAgent:
 			noise = np.concatenate((noise, -noise))
 			noise_weights = []
 			performances = []
-			plot_data = [] # collects the average noise performances for each iteration. can be plotted with self.plot
 			### a bunch of data preprocessing incoming ###
 			classifier_cats = random.sample(self.train_cats, nb_classifiers)
 			classifier_data_cat = [load_files(categories=1, per_category=100, rand=False, names=[cat])[cat[:-4]] for cat in classifier_cats] # contains 50 samples from each classifier's category
@@ -296,7 +299,7 @@ class EvoAgent:
 			print(f'min and max noise performance: {min(performances)}, {max(performances)}')
 			noise_weights = np.array(noise_weights)
 			noise_weights = softmax(100*noise_weights) # enforces better weighting in the update while bounding the update step size
-			print(f'noise weights: {sorted(noise_weights)}')
+			print(f'top ten noise weights: {sorted(noise_weights)[-10:]}')
 			print(f'max noise weight: {max(noise_weights)}')
 			noise_weights = noise_weights.reshape(len(noise_weights), 1)
 			weight_update = self.lr/(2*self.n*self.sigma)*sum(noise_weights*noise)
