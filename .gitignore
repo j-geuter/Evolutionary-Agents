@@ -3,5 +3,5 @@ data/*
 data2/*
 paper/*
 MNISTClassification/standardcnn.py
-FewShotModel/pictures/*
-FewShotModel/data/*
+2LayerModel/pictures/*
+2LayerModel/data/*
