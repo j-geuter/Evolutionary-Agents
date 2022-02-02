@@ -5,6 +5,7 @@ import numpy as np
 from tqdm import tqdm
 import torch.nn.functional as F
 import ast
+from scipy.special import softmax
 
 from torchvision import datasets
 import torchvision.transforms
@@ -15,6 +16,7 @@ from matplotlib import pyplot as plt
 import math
 import os
 import random
+import matplotlib.pyplot as plt
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -217,7 +219,7 @@ class EvoAgent:
 	:param categories_ratio: ratio of how many categories are for training.
 	:param dir: directory of data. NOTE: Change accordingly.
 	'''
-	def __init__(self, lr = 0.001, sigma = 0.01, n = 100, train_nb = 100, test_nb = 100, model = '', categories_ratio = 0.7, dir = '/home/jonathan/Documents/Studium/VaiosProject/FewShotModel/data/'):
+	def __init__(self, lr = 0.015, sigma = 0.01, n = 1000, train_nb = 100, test_nb = 100, model = '', categories_ratio = 0.7, dir = '/home/jonathan/Documents/Studium/VaiosProject/FewShotModel/data/'):
 		categories = os.listdir(dir)
 		nb_train = int(categories_ratio*len(categories))
 		self.train_cats = random.sample(categories, nb_train) # names of categories used for training
@@ -255,12 +257,16 @@ class EvoAgent:
 		'''
 		Trains agent.
 		'''
+		avg_perf = 0
 		for i in tqdm(range(rounds)):
+			print('\n--------------------------------------------------------------------------------')
 			curr_weights = deepcopy(weights_to_vec(self.net))
 			print('current absolute weight average: {}'.format(curr_weights.abs().mean()))
 			noise = np.array([np.array(self.dist.sample()) for _ in range(self.n)], dtype=float)
 			noise = np.concatenate((noise, -noise))
-			tests = []
+			noise_weights = []
+			performances = []
+			plot_data = [] # collects the average noise performances for each iteration. can be plotted with self.plot
 			### a bunch of data preprocessing incoming ###
 			classifier_cats = random.sample(self.train_cats, nb_classifiers)
 			classifier_data_cat = [load_files(categories=1, per_category=100, rand=False, names=[cat])[cat[:-4]] for cat in classifier_cats] # contains 50 samples from each classifier's category
@@ -278,19 +284,42 @@ class EvoAgent:
 			other_data_test = self.net(torch.tensor(other_data_test.reshape(50, 1, 28, 28), dtype=torch.float32))
 			other_test_targets = torch.tensor([[0, 1] for i in range(len(other_data_test))], dtype=torch.float32)
 			### end of bunch ###
-			weight_update = np.zeros(self.parnumber, dtype=float)
 			for j in range(2*self.n):
 				classifiers = [Classifier(self, classifier_train_cat[i], train_cat_targets, other_data_train, other_train_targets, classifier_test_cat[i], test_cat_targets, other_data_test, other_test_targets) for i in range(nb_classifiers)]
 				scores = [classifier.train() for classifier in classifiers]
-				weight_update += float(sum(scores))*noise[j]
-				tests.append(sum(scores)/nb_classifiers)
-			#print('noise performance: {}'.format(tests))
-			print('avg noise performance: {}'.format(sum(tests)/len(tests)))
-			print(f'min and max noise performance: {min(tests)}, {max(tests)}')
-			weight_update = self.lr/(2*self.n*self.sigma)*weight_update
+				#print(f'classifier scores: {scores}')
+				noise_weights.append(max(0, float(sum(scores))/nb_classifiers-avg_perf)) # performance of 'good' noise. only remember noise that performed better than the previous average
+				performances.append(float(sum(scores))/nb_classifiers) # contains actual performances
+			avg_perf = sum(performances)/len(performances)
+			plot_data.append(avg_perf)
+			print('avg noise performance: {}'.format(avg_perf))
+			print(f'min and max noise performance: {min(performances)}, {max(performances)}')
+			noise_weights = np.array(noise_weights)
+			noise_weights = softmax(100*noise_weights) # enforces better weighting in the update while bounding the update step size
+			print(f'noise weights: {sorted(noise_weights)}')
+			print(f'max noise weight: {max(noise_weights)}')
+			noise_weights = noise_weights.reshape(len(noise_weights), 1)
+			weight_update = self.lr/(2*self.n*self.sigma)*sum(noise_weights*noise)
 			print('weight update mean: {}'.format(torch.tensor(weight_update).abs().mean()))
 			new_weights = (curr_weights + weight_update).to(torch.float32)
 			vec_to_weights(new_weights, self.net)
+		return plot_data
+
+	def plot(self, data, x = None, x_l = 'Iteration', y_l = 'Performance'):
+		'''
+		Plots `data`.
+		:param data: list or similar containing data to be plotted.
+		:param x: x-axis data. If None, set to [i for i in range(len(data))].
+		:param x_l: x-axis label
+		:param y_l: y-axis label
+		'''
+		if x == None:
+			x = [i for i in range(len(data))]
+		plt.plot(x, data)
+		plt.xlabel(x_l)
+		plt.ylabel(y_l)
+		plt.show()
+
 
 if __name__ == '__main__':
 	a = EvoAgent()
