@@ -1,1 +1,7 @@
+MNISTClassification/data/*
 data/*
+data2/*
+paper/*
+MNISTClassification/standardcnn.py
+FewShotModel/pictures/*
+FewShotModel/data/*
