@@ -293,6 +293,8 @@ class EvoAgent:
 			other_test_targets = torch.tensor([[0, 1] for i in range(test_nb)], dtype=torch.float32)
 			### end of bunch ###
 			for j in range(2*self.n):
+				weights = (curr_weights + self.sigma*noise[j]).to(torch.float32)
+				vec_to_weights(weights, self.net)
 				classifiers = [Classifier(self, classifier_train_cat[i], train_cat_targets, other_data_train, other_train_targets, classifier_test_cat[i], test_cat_targets, other_data_test, other_test_targets) for i in range(nb_classifiers)]
 				scores = [classifier.train() for classifier in classifiers]
 				#print(f'classifier scores: {scores}')
@@ -308,6 +310,67 @@ class EvoAgent:
 			print(f'max noise weight: {max(noise_weights)}')
 			noise_weights = noise_weights.reshape(len(noise_weights), 1)
 			weight_update = self.lr/(2*self.n*self.sigma)*sum(noise_weights*noise)
+			print('weight update mean: {}'.format(torch.tensor(weight_update).abs().mean()))
+			new_weights = (curr_weights + weight_update).to(torch.float32)
+			vec_to_weights(new_weights, self.net)
+		return plot_data
+
+	def train_elite(self, rounds = 100, nb_classifiers = 8, elite = 0.1):
+		'''
+		Trains agent by creating noise samples in each iteration, and then updating the network's weights using the average of the elite set, which is the best
+		`elite` of its offspring.
+		:param rounds: number of training rounds.
+		:param nb_classifiers: number of classifiers generated for each noise sample.
+		:return: `plot_data` which tracks the average noise performance for each training iteration.
+		'''
+		avg_perf = 0
+		plot_data = [] # collects the average noise performances for each iteration. can be plotted with self.plot
+		for i in tqdm(range(rounds)):
+			print('\n--------------------------------------------------------------------------------')
+			curr_weights = deepcopy(weights_to_vec(self.net))
+			print('current absolute weight average: {}'.format(curr_weights.abs().mean()))
+			noise = np.array([np.array(self.dist.sample()) for _ in range(self.n)], dtype=float)
+			noise = np.concatenate((noise, -noise))
+			noise_weights = []
+			performances = []
+			### a bunch of data preprocessing incoming ###
+			train_nb = self.train_nb//2
+			test_nb = self.test_nb//2
+			classifier_cats = random.sample(self.train_cats, nb_classifiers)
+			classifier_data_cat = [load_files(categories=1, per_category=train_nb+test_nb, rand=False, names=[cat])[cat[:-4]] for cat in classifier_cats] # contains 50 samples from each classifier's category
+			classifier_train_cat = [data[:train_nb] for data in classifier_data_cat]
+			classifier_train_cat = [self.net(torch.tensor(data.reshape(train_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_train_cat] # preprocess data by first layer network
+			train_cat_targets = torch.tensor([[1, 0] for i in range(train_nb)], dtype=torch.float32)
+			classifier_test_cat = [data[-test_nb:] for data in classifier_data_cat]
+			classifier_test_cat = [self.net(torch.tensor(data.reshape(test_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_test_cat]
+			test_cat_targets = torch.tensor([[1, 0] for i in range(test_nb)], dtype=torch.float32)
+			other_nb = (train_nb+test_nb)//10
+			other_data = load_files(categories=10, per_category=other_nb, rand=True, not_names=classifier_cats)
+			other_data_train = np.concatenate([item[1][:train_nb//10] for item in other_data.items()]) # np.array with data from other categories used in training
+			other_data_train = self.net(torch.tensor(other_data_train.reshape(train_nb, 1, 28, 28), dtype=torch.float32))
+			other_train_targets = torch.tensor([[0, 1] for i in range(train_nb)], dtype=torch.float32) # targets for training data from other categories
+			other_data_test = np.concatenate([item[1][-test_nb//10:] for item in other_data.items()]) # same as above for testing
+			other_data_test = self.net(torch.tensor(other_data_test.reshape(test_nb, 1, 28, 28), dtype=torch.float32))
+			other_test_targets = torch.tensor([[0, 1] for i in range(test_nb)], dtype=torch.float32)
+			### end of bunch ###
+			for j in range(2*self.n):
+				weights = (curr_weights + self.sigma*noise[j]).to(torch.float32)
+				vec_to_weights(weights, self.net)
+				classifiers = [Classifier(self, classifier_train_cat[i], train_cat_targets, other_data_train, other_train_targets, classifier_test_cat[i], test_cat_targets, other_data_test, other_test_targets) for i in range(nb_classifiers)]
+				scores = [classifier.train() for classifier in classifiers]
+				#print(f'classifier scores: {scores}')
+				performances.append(float(sum(scores))/nb_classifiers) # contains performances of each noise sample as a value between 0 and 1
+			avg_perf = sum(performances)/len(performances)
+			plot_data.append(avg_perf)
+			print('avg noise performance: {}'.format(avg_perf))
+			print(f'min and max noise performance: {min(performances)}, {max(performances)}')
+			noise = [[noise[j], performances[j]] for j in range(2*self.n)]
+			elite_share = int(2*self.n*elite)
+			noise = sorted(noise, key=lambda x: x[1])
+			elite_performance = [n[1] for n in noise[-elite_share:]]
+			print(f'Elite performance: {elite_performance[0]} to {elite_performance[-1]}')
+			elite_set = np.array([noise[j][0] for j in range(2*self.n-elite_share, 2*self.n)])
+			weight_update = self.sigma*sum(elite_set)/elite_share
 			print('weight update mean: {}'.format(torch.tensor(weight_update).abs().mean()))
 			new_weights = (curr_weights + weight_update).to(torch.float32)
 			vec_to_weights(new_weights, self.net)
