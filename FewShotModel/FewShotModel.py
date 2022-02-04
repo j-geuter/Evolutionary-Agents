@@ -219,7 +219,7 @@ class EvoAgent:
 	:param categories_ratio: ratio of how many categories are for training.
 	:param dir: directory of data. NOTE: Change accordingly.
 	'''
-	def __init__(self, lr = 0.075, sigma = 0.01, n = 500, train_nb = 40, test_nb = 200, model = '', categories_ratio = 0.7, dir = '/home/jonathan/Documents/Studium/VaiosProject/FewShotModel/data/'):
+	def __init__(self, lr = 0.075, sigma = 0.01, n = 300, train_nb = 40, test_nb = 100, model = '', categories_ratio = 0.7, dir = '/home/jonathan/Documents/Studium/VaiosProject/FewShotModel/data/'):
 		categories = os.listdir(dir)
 		nb_train = int(categories_ratio*len(categories))
 		self.train_cats = random.sample(categories, nb_train) # names of categories used for training
@@ -278,24 +278,28 @@ class EvoAgent:
 			classifier_cats = random.sample(self.train_cats, nb_classifiers)
 			classifier_data_cat = [load_files(categories=1, per_category=train_nb+test_nb, rand=False, names=[cat])[cat[:-4]] for cat in classifier_cats] # contains 50 samples from each classifier's category
 			classifier_train_cat = [data[:train_nb] for data in classifier_data_cat]
-			classifier_train_cat = [self.net(torch.tensor(data.reshape(train_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_train_cat] # preprocess data by first layer network
+
 			train_cat_targets = torch.tensor([[1, 0] for i in range(train_nb)], dtype=torch.float32)
 			classifier_test_cat = [data[-test_nb:] for data in classifier_data_cat]
-			classifier_test_cat = [self.net(torch.tensor(data.reshape(test_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_test_cat]
+
 			test_cat_targets = torch.tensor([[1, 0] for i in range(test_nb)], dtype=torch.float32)
 			other_nb = (train_nb+test_nb)//10
 			other_data = load_files(categories=10, per_category=other_nb, rand=True, not_names=classifier_cats)
 			other_data_train = np.concatenate([item[1][:train_nb//10] for item in other_data.items()]) # np.array with data from other categories used in training
-			other_data_train = self.net(torch.tensor(other_data_train.reshape(train_nb, 1, 28, 28), dtype=torch.float32))
+
 			other_train_targets = torch.tensor([[0, 1] for i in range(train_nb)], dtype=torch.float32) # targets for training data from other categories
 			other_data_test = np.concatenate([item[1][-test_nb//10:] for item in other_data.items()]) # same as above for testing
-			other_data_test = self.net(torch.tensor(other_data_test.reshape(test_nb, 1, 28, 28), dtype=torch.float32))
+
 			other_test_targets = torch.tensor([[0, 1] for i in range(test_nb)], dtype=torch.float32)
 			### end of bunch ###
 			for j in range(2*self.n):
 				weights = (curr_weights + self.sigma*noise[j]).to(torch.float32)
 				vec_to_weights(weights, self.net)
-				classifiers = [Classifier(self, classifier_train_cat[i], train_cat_targets, other_data_train, other_train_targets, classifier_test_cat[i], test_cat_targets, other_data_test, other_test_targets) for i in range(nb_classifiers)]
+				tmp_classifier_train_cat = [self.net(torch.tensor(data.reshape(train_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_train_cat] # preprocess data by first layer network
+				tmp_classifier_test_cat = [self.net(torch.tensor(data.reshape(test_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_test_cat]
+				tmp_other_data_train = self.net(torch.tensor(other_data_train.reshape(train_nb, 1, 28, 28), dtype=torch.float32))
+				tmp_other_data_test = self.net(torch.tensor(other_data_test.reshape(test_nb, 1, 28, 28), dtype=torch.float32))
+				classifiers = [Classifier(self, tmp_classifier_train_cat[i], train_cat_targets, tmp_other_data_train, other_train_targets, tmp_classifier_test_cat[i], test_cat_targets, tmp_other_data_test, other_test_targets) for i in range(nb_classifiers)]
 				scores = [classifier.train() for classifier in classifiers]
 				#print(f'classifier scores: {scores}')
 				noise_weights.append(max(0, float(sum(scores))/nb_classifiers-avg_perf)) # performance of 'good' noise. only remember noise that performed better than the previous average
@@ -339,24 +343,28 @@ class EvoAgent:
 			classifier_cats = random.sample(self.train_cats, nb_classifiers)
 			classifier_data_cat = [load_files(categories=1, per_category=train_nb+test_nb, rand=False, names=[cat])[cat[:-4]] for cat in classifier_cats] # contains 50 samples from each classifier's category
 			classifier_train_cat = [data[:train_nb] for data in classifier_data_cat]
-			classifier_train_cat = [self.net(torch.tensor(data.reshape(train_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_train_cat] # preprocess data by first layer network
+
 			train_cat_targets = torch.tensor([[1, 0] for i in range(train_nb)], dtype=torch.float32)
 			classifier_test_cat = [data[-test_nb:] for data in classifier_data_cat]
-			classifier_test_cat = [self.net(torch.tensor(data.reshape(test_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_test_cat]
+
 			test_cat_targets = torch.tensor([[1, 0] for i in range(test_nb)], dtype=torch.float32)
 			other_nb = (train_nb+test_nb)//10
 			other_data = load_files(categories=10, per_category=other_nb, rand=True, not_names=classifier_cats)
 			other_data_train = np.concatenate([item[1][:train_nb//10] for item in other_data.items()]) # np.array with data from other categories used in training
-			other_data_train = self.net(torch.tensor(other_data_train.reshape(train_nb, 1, 28, 28), dtype=torch.float32))
+
 			other_train_targets = torch.tensor([[0, 1] for i in range(train_nb)], dtype=torch.float32) # targets for training data from other categories
 			other_data_test = np.concatenate([item[1][-test_nb//10:] for item in other_data.items()]) # same as above for testing
-			other_data_test = self.net(torch.tensor(other_data_test.reshape(test_nb, 1, 28, 28), dtype=torch.float32))
+
 			other_test_targets = torch.tensor([[0, 1] for i in range(test_nb)], dtype=torch.float32)
 			### end of bunch ###
 			for j in range(2*self.n):
 				weights = (curr_weights + self.sigma*noise[j]).to(torch.float32)
 				vec_to_weights(weights, self.net)
-				classifiers = [Classifier(self, classifier_train_cat[i], train_cat_targets, other_data_train, other_train_targets, classifier_test_cat[i], test_cat_targets, other_data_test, other_test_targets) for i in range(nb_classifiers)]
+				tmp_classifier_train_cat = [self.net(torch.tensor(data.reshape(train_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_train_cat] # preprocess data by first layer network
+				tmp_classifier_test_cat = [self.net(torch.tensor(data.reshape(test_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_test_cat]
+				tmp_other_data_train = self.net(torch.tensor(other_data_train.reshape(train_nb, 1, 28, 28), dtype=torch.float32))
+				tmp_other_data_test = self.net(torch.tensor(other_data_test.reshape(test_nb, 1, 28, 28), dtype=torch.float32))
+				classifiers = [Classifier(self, tmp_classifier_train_cat[i], train_cat_targets, tmp_other_data_train, other_train_targets, tmp_classifier_test_cat[i], test_cat_targets, tmp_other_data_test, other_test_targets) for i in range(nb_classifiers)]
 				scores = [classifier.train() for classifier in classifiers]
 				#print(f'classifier scores: {scores}')
 				performances.append(float(sum(scores))/nb_classifiers) # contains performances of each noise sample as a value between 0 and 1
