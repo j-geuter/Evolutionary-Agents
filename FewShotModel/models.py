@@ -237,7 +237,7 @@ class EvoAgent:
 				tmp_other_data_test = self.net(torch.tensor(other_data_test.reshape(test_nb, 1, 28, 28), dtype=torch.float32))
 				classifiers = [Classifier(self, tmp_classifier_train_cat[i], train_cat_targets, tmp_other_data_train, other_train_targets, tmp_classifier_test_cat[i], test_cat_targets, tmp_other_data_test, other_test_targets) for i in range(nb_classifiers)]
 				scores = [classifier.train() for classifier in classifiers]
-				print(f'Avg classifier score: {sum(scores)/nb_classifiers}')
+				#print(f'Avg classifier score: {sum(scores)/nb_classifiers}')
 				performances.append(float(sum(scores))/nb_classifiers) # contains performances of each noise sample as a value between 0 and 1
 			avg_perf = sum(performances)/len(performances)
 			plot_data.append(avg_perf)
