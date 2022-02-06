@@ -63,28 +63,19 @@ class Classifier:
 		self.net.train()
 		for i in range(n//5): # training loop
 			out = self.net(traindata[i:i+5])
-			#print(f"Classifier training prediction: {out}")
-			#print(f"Classifier training data batch: {traindata[i:i+5]}")
 			self.optimizer.zero_grad()
 			loss = F.binary_cross_entropy(out, traintargets[i:i+5])
-			#print(f"Batch loss: {loss}")
-			#print(f"Classifier training targets batch: {traintargets[i:i+5]}")
 			loss.backward()
 			self.optimizer.step()
 		return self.test(self.testdata_cat, self.testdata_other, self.testtargets_cat, self.testtargets_other)
 
 	def test(self, testdata_cat, testdata_other, testtargets_cat, testtargets_other):
 		self.net.eval()
-		#print(f'{testdata_cat=}, {testdata_other=}, {testtargets_cat=}, {testtargets_other=}')
 		testdata = torch.cat((testdata_cat, testdata_other))
 		testtargets = torch.cat((testtargets_cat, testtargets_other))
-		#print(f"Classifier test data targets: {testtargets}")
 		targets_guess = self.net(testdata)
-		#print(f"Classifier test data target guess: {targets_guess}")
 		m = len(testtargets)
 		compare = [torch.argmax(testtargets[i])==torch.argmax(targets_guess[i]) for i in range(m)]
-		#print(f'{compare}, {sum(compare)/m=}')
-		#print(f"Classifier performance: {sum(compare)/m}")
 		return sum(compare)/m
 
 
@@ -92,8 +83,6 @@ class Classifier:
 class EvoAgent:
 	'''
 	Class for an evolutionary agent.
-	NOTE: `test_nb` seems to deliver reasonably accurate results for ~200 (wehre additional test runs tend to be in a +/-1% range).
-	For 100, test results are probably a bit too inaccurate (where additional test runs tend to be in a +/-3% range).
 	:param lr: learning rate
 	:param sigma: deviation used in sampling
 	:param n: number of samples generated in each training iteration
@@ -227,27 +216,16 @@ class EvoAgent:
 			train_nb = self.train_nb//2
 			test_nb = self.test_nb//2
 			classifier_cats = random.sample(self.train_cats, nb_classifiers)
-
-			classifier_data_cat = [load_files(categories=1, per_category=train_nb+test_nb+test_nb, rand=False, names=[cat])[cat[:-4]] for cat in classifier_cats] # contains samples from each classifier's category
-
+			classifier_data_cat = [load_files(categories=1, per_category=train_nb+test_nb, rand=False, names=[cat])[cat[:-4]] for cat in classifier_cats] # contains samples from each classifier's category
 			classifier_train_cat = [data[:train_nb] for data in classifier_data_cat]
 			train_cat_targets = torch.tensor([[1, 0] for i in range(train_nb)], dtype=torch.float32)
 			classifier_test_cat = [data[-test_nb:] for data in classifier_data_cat]
-
-			classifier_test_cat2 = [data[train_nb:-test_nb] for data in classifier_data_cat]
-
 			test_cat_targets = torch.tensor([[1, 0] for i in range(test_nb)], dtype=torch.float32)
-
-			other_nb = (train_nb+test_nb+test_nb)//10
-
+			other_nb = (train_nb+test_nb)//10
 			other_data = load_files(categories=10, per_category=other_nb, rand=True, not_names=classifier_cats)
 			other_data_train = np.concatenate([item[1][:train_nb//10] for item in other_data.items()]) # np.array with data from other categories used in training
-
 			other_train_targets = torch.tensor([[0, 1] for i in range(train_nb)], dtype=torch.float32) # targets for training data from other categories
 			other_data_test = np.concatenate([item[1][-test_nb//10:] for item in other_data.items()]) # same as above for testing
-
-			other_data_test2 = np.concatenate([item[1][train_nb//10:-test_nb//10] for item in other_data.items()]) # same as above for testing
-
 			other_test_targets = torch.tensor([[0, 1] for i in range(test_nb)], dtype=torch.float32)
 			### end of bunch ###
 			for j in range(2*self.n):
@@ -255,16 +233,11 @@ class EvoAgent:
 				vec_to_weights(weights, self.net)
 				tmp_classifier_train_cat = [self.net(torch.tensor(data.reshape(train_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_train_cat] # preprocess data by first layer network
 				tmp_classifier_test_cat = [self.net(torch.tensor(data.reshape(test_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_test_cat]
-				tmp_classifier_test_cat2 = [self.net(torch.tensor(data.reshape(test_nb, 1, 28, 28), dtype=torch.float32)) for data in classifier_test_cat2]
 				tmp_other_data_train = self.net(torch.tensor(other_data_train.reshape(train_nb, 1, 28, 28), dtype=torch.float32))
 				tmp_other_data_test = self.net(torch.tensor(other_data_test.reshape(test_nb, 1, 28, 28), dtype=torch.float32))
-				tmp_other_data_test2 = self.net(torch.tensor(other_data_test2.reshape(test_nb, 1, 28, 28), dtype=torch.float32))
 				classifiers = [Classifier(self, tmp_classifier_train_cat[i], train_cat_targets, tmp_other_data_train, other_train_targets, tmp_classifier_test_cat[i], test_cat_targets, tmp_other_data_test, other_test_targets) for i in range(nb_classifiers)]
 				scores = [classifier.train() for classifier in classifiers]
-				scores2 = [classifiers[i].test(tmp_classifier_test_cat2[i], tmp_other_data_test2, test_cat_targets, other_test_targets) for i in range(nb_classifiers)]
-				diff = [scores[i]-scores2[i] for i in range(len(scores))]
-				#print(f'{sum(scores)/len(scores)-sum(scores2)/len(scores2)}')
-				print(f'Avg classifier score: {sum(scores)/nb_classifiers}, \nAvg score 2: {sum(scores2)/nb_classifiers}')
+				print(f'Avg classifier score: {sum(scores)/nb_classifiers}')
 				performances.append(float(sum(scores))/nb_classifiers) # contains performances of each noise sample as a value between 0 and 1
 			avg_perf = sum(performances)/len(performances)
 			plot_data.append(avg_perf)
